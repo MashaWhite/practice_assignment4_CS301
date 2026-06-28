@@ -1,0 +1,78 @@
+1.Без використання індексів час 18.285 ms
+2.З використанням індексів час 5.923 ms
+
+1.
+Nested Loop Left Join  (cost=515.75..4969.41 rows=1 width=36) (actual time=18.204..18.215 rows=1.00 loops=1)
+  Buffers: shared hit=1949
+  ->  GroupAggregate  (cost=515.75..695.98 rows=1 width=28) (actual time=3.285..3.295 rows=1.00 loops=1)
+        Buffers: shared hit=181
+        ->  Nested Loop  (cost=515.75..694.32 rows=330 width=17) (actual time=1.998..3.261 rows=330.00 loops=1)
+              Buffers: shared hit=181
+              ->  Bitmap Heap Scan on chats c  (cost=4.28..8.30 rows=1 width=12) (actual time=0.020..0.023 rows=1.00 loops=1)
+                    Recheck Cond: (chat_id = 500)
+                    Heap Blocks: exact=1
+                    Buffers: shared hit=3
+                    ->  Bitmap Index Scan on chats_pkey  (cost=0.00..4.28 rows=1 width=0) (actual time=0.008..0.009 rows=1.00 loops=1)
+                          Index Cond: (chat_id = 500)
+                          Index Searches: 1
+                          Buffers: shared hit=2
+              ->  Hash Right Join  (cost=511.46..682.72 rows=330 width=9) (actual time=1.975..3.206 rows=330.00 loops=1)
+                    Hash Cond: (ap.account_id = m.member_id)
+                    Buffers: shared hit=178
+                    ->  Seq Scan on account_presence ap  (cost=0.00..145.00 rows=10000 width=5) (actual time=0.009..0.540 rows=10000.00 loops=1)
+                          Buffers: shared hit=45
+                    ->  Hash  (cost=507.34..507.34 rows=330 width=8) (actual time=1.951..1.952 rows=330.00 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 21kB
+                          Buffers: shared hit=133
+                          ->  Seq Scan on chat_members m  (cost=0.00..507.34 rows=330 width=8) (actual time=0.017..1.910 rows=330.00 loops=1)
+                                Filter: (chat_id = 500)
+                                Rows Removed by Filter: 29617
+                                Buffers: shared hit=133
+  ->  GroupAggregate  (cost=0.00..4273.41 rows=1 width=12) (actual time=14.902..14.902 rows=1.00 loops=1)
+        Buffers: shared hit=1768
+        ->  Seq Scan on messages  (cost=0.00..4268.00 rows=2160 width=8) (actual time=0.017..14.770 rows=1982.00 loops=1)
+              Filter: (chat_id = 500)
+              Rows Removed by Filter: 198018
+              Buffers: shared hit=1768
+Planning:
+  Buffers: shared hit=12
+Planning Time: 0.474 ms
+Execution Time: 18.285 ms
+
+2.
+Nested Loop Left Join  (cost=25.88..2715.06 rows=1 width=36) (actual time=5.784..5.789 rows=1.00 loops=1)
+  Buffers: shared hit=1932 read=4
+  ->  GroupAggregate  (cost=0.85..797.27 rows=1 width=28) (actual time=1.650..1.653 rows=1.00 loops=1)
+        Buffers: shared hit=748
+        ->  Nested Loop  (cost=0.85..795.61 rows=330 width=17) (actual time=0.083..1.622 rows=330.00 loops=1)
+              Buffers: shared hit=748
+              ->  Index Scan using chats_pkey on chats c  (cost=0.28..8.29 rows=1 width=12) (actual time=0.018..0.019 rows=1.00 loops=1)
+                    Index Cond: (chat_id = 500)
+                    Index Searches: 1
+                    Buffers: shared hit=3
+              ->  Nested Loop Left Join  (cost=0.57..784.02 rows=330 width=9) (actual time=0.063..1.576 rows=330.00 loops=1)
+                    Buffers: shared hit=745
+                    ->  Index Only Scan using chat_members_pkey on chat_members m  (cost=0.29..564.19 rows=330 width=8) (actual time=0.040..1.149 rows=330.00 loops=1)
+                          Index Cond: (chat_id = 500)
+                          Heap Fetches: 0
+                          Index Searches: 1
+                          Buffers: shared hit=84
+                    ->  Index Only Scan using idx_account_id_is_online on account_presence ap  (cost=0.29..0.67 rows=1 width=5) (actual time=0.001..0.001 rows=1.00 loops=330)
+                          Index Cond: (account_id = m.member_id)
+                          Heap Fetches: 0
+                          Index Searches: 330
+                          Buffers: shared hit=661
+  ->  GroupAggregate  (cost=25.04..1917.77 rows=1 width=12) (actual time=4.129..4.130 rows=1.00 loops=1)
+        Buffers: shared hit=1184 read=4
+        ->  Bitmap Heap Scan on messages  (cost=25.04..1912.36 rows=2160 width=8) (actual time=1.006..3.834 rows=1982.00 loops=1)
+              Recheck Cond: (chat_id = 500)
+              Heap Blocks: exact=1184
+              Buffers: shared hit=1184 read=4
+              ->  Bitmap Index Scan on "idx_message_іd_chat_id"  (cost=0.00..24.50 rows=2160 width=0) (actual time=0.869..0.869 rows=1982.00 loops=1)
+                    Index Cond: (chat_id = 500)
+                    Index Searches: 1
+                    Buffers: shared read=4
+Planning:
+  Buffers: shared hit=30 read=1
+Planning Time: 2.547 ms
+Execution Time: 5.923 ms
