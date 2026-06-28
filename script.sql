@@ -1,34 +1,40 @@
 create database pa4;
 
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS accounts CASCADE;
-DROP TABLE IF EXISTS account_presence CASCADE;
-DROP TABLE IF EXISTS contacts CASCADE;
-DROP TABLE IF EXISTS chat_members CASCADE;
-DROP TABLE IF EXISTS messages CASCADE;
+drop table if exists
+drop table if exists users cascade;
+drop table if exists accounts cascade;
+drop table if exists account_presence cascade;
+drop table if exists contacts cascade;
+drop table if exists chat_members cascade;
+drop table if exists messages cascade;
 
+
+--створення таблиць
 create table if not exists users(
     user_id int generated always as identity primary key,
     first_name varchar not null,
     last_name varchar not null,
+    --вік може бути null, якщо користувач не бажає вказувати
     age int,
     email varchar not null,
     phone varchar not null
 );
 create table if not exists accounts(
     account_id int generated always as identity primary key,
-    user_id int not null REFERENCES users(user_id) ON DELETE CASCADE,
+    user_id int not null references users(user_id) on delete cascade,
     nickname varchar not null,
     description varchar not null,
     status varchar default 'active'
 );
 create table if not exists account_presence(
-    account_id int not null primary key REFERENCES accounts(account_id) ON DELETE CASCADE,
+	--account id є водночас і primary key, і foreign key
+    account_id int not null primary key references accounts(account_id) on delete cascade,
     is_online boolean default false
 );
 create table if not exists contacts(
-    account_id int not null REFERENCES accounts(account_id) ON DELETE CASCADE,
-    contact_id int not null REFERENCES accounts(account_id) ON DELETE CASCADE,
+    account_id int not null references accounts(account_id) on delete cascade,
+    contact_id int not null references accounts(account_id) on delete cascade,
+    --primary key тут буде поєднувати два атрибути
     primary key(account_id, contact_id)
 );
 create table if not exists chats(
@@ -37,20 +43,21 @@ create table if not exists chats(
     created_at timestamp default current_timestamp
 );
 create table if not exists chat_members(
-    member_id int not null REFERENCES accounts(account_id) ON DELETE CASCADE,
-    chat_id int not null REFERENCES chats(chat_id) ON DELETE CASCADE,
+    member_id int not null references accounts(account_id) on delete cascade,
+    chat_id int not null references chats(chat_id) on delete cascade,
+    --primary key тут буде поєднувати два атрибути
     primary key(member_id, chat_id)
 );
 create table if not exists messages(
     message_id int generated always as identity primary key,
-    sender_id int not null REFERENCES accounts(account_id) ON DELETE CASCADE,
-    chat_id int not null REFERENCES chats(chat_id) ON DELETE CASCADE,
+    sender_id int not null references accounts(account_id) on delete cascade,
+    chat_id int not null references chats(chat_id) on delete cascade,
     content varchar not null,
     sent_time timestamp default current_timestamp
 );
 create table if not exists user_log(
 	log_id int generated always as identity primary key,
-    user_id int not null REFERENCES users(user_id) ON DELETE CASCADE,
+    user_id int not null references users(user_id) on delete cascade,
     action varchar,
     log_date timestamp default current_timestamp
 );
@@ -100,44 +107,53 @@ end;
 $$;
 
 
-
+--view виводить інформацію про чати - id, назву, кількість учасників, 
+--кількість учасників онлайн, кількість повідомлень
 create or replace view chats_info as(
-with chat_general_info as(select c.chat_id, c.chat_name, count( m.member_id) as members_total, 
-	count( m.member_id) filter (where ap.is_online = true) as members_online
-from chats as c join chat_members as m 
-on c.chat_id = m.chat_id
-left join account_presence as ap
-on ap.account_id = m.member_id
-group by c.chat_id, c.chat_name),
-chat_messages_total as(
-select chat_id, count(message_id) as messages_total
-from messages
-group by chat_id)
-select  i.chat_id, i.chat_name, i.members_total, i.members_online, coalesce(m.messages_total,0) as messages_total
-from chat_general_info as i
-left join chat_messages_total m on i.chat_id = m.chat_id);
+--спочатку cte для всього окрім кількості повідомлень
+	with chat_general_info as(
+		select c.chat_id, c.chat_name, count( m.member_id) as members_total, 
+			count( m.member_id) filter (where ap.is_online = true) as members_online
+		from chats as c join chat_members as m 
+		on c.chat_id = m.chat_id
+		join account_presence as ap
+		on ap.account_id = m.member_id
+		group by c.chat_id, c.chat_name),
+	--cte для кількості повідомлень окремо
+	chat_messages_total as(
+		select chat_id, count(message_id) as messages_total
+		from messages
+		group by chat_id)
+	select  i.chat_id, i.chat_name, i.members_total, i.members_online, coalesce(m.messages_total,0) as messages_total
+	from chat_general_info as i
+	--left join тому що може бути чат без повідомлень
+	left join chat_messages_total m on i.chat_id = m.chat_id);
 
 
 
+--індекси
 
-drop INDEX IF EXISTS idx_user_id;
-drop INDEX IF EXISTS idx_account_id;
-drop INDEX IF EXISTS idx_account_id_presence;
-drop INDEX IF EXISTS idx_account_is_online;
-drop INDEX IF EXISTS idx_account_id_contact_id_contacts;
-drop INDEX IF EXISTS idx_members_chat_id;
-drop INDEX IF exists idx_chat_name_id;
-drop INDEX IF EXISTS idx_message_іd_chat_id;
+drop index if exists idx_user_id;
+drop index if exists idx_account_id;
+drop index if exists idx_account_is_online;
+drop index if exists idx_account_id_contact_id_contacts;
+drop index if exists idx_members_chat_id;
+drop INDEX if exists idx_chat_name_id;
+drop index if exists idx_message_іd_chat_id;
 
-CREATE INDEX IF NOT EXISTS idx_user_id ON users(user_id);
-CREATE INDEX IF NOT EXISTS idx_account_id ON accounts(account_id);
-CREATE INDEX IF NOT EXISTS idx_account_id_presence ON account_presence(account_id);
-CREATE INDEX IF NOT EXISTS idx_account_id_is_online ON account_presence(account_id, is_online);
-CREATE INDEX IF NOT EXISTS idx_account_id_contact_id_contacts ON contacts(account_id, contact_id);
-CREATE INDEX IF NOT EXISTS idx_members_chat_id ON chat_members(chat_id);
-CREATE INDEX IF NOT EXISTS idx_chat_name_id ON chats(chat_id, chat_name);
-CREATE INDEX IF NOT EXISTS idx_message_іd_chat_id on messages(chat_id);
-
+/*для оптимізації мого запиту потрібні лише 
+ -idx_members_chat_id, 
+ -idx_chat_name_id, 
+ -idx_account_id_is_online
+ проте я також створила і інші, для інших можлвих запитів
+ */
+create index if not exists idx_members_chat_id on chat_members(chat_id);
+create index if not exists idx_chat_name_id on chats(chat_id, chat_name);
+create index if not exists idx_account_id_is_online on account_presence(account_id, is_online);
+create index if not exists idx_message_іd_chat_id on messages(chat_id);
+create index if not exists idx_user_id on users(user_id);
+create index if not exists idx_account_id on accounts(account_id);
+create index if not exists idx_account_id_contact_id_contacts on contacts(account_id, contact_id);
 
 
 --запит покаже інформацію про чат з id = 500
@@ -151,4 +167,14 @@ set enable_seqscan = off;
 set enable_indexscan = on ;
 explain analyze
 select * from chats_info where chat_id = 500;
+	
+--тестування тригера
+--створила cte, щоб збеергти значення id
+with new_user as(
+insert into users(first_name, last_name, age, email, phone) 
+values ('Anna', 'Litvinchuk', 12, 'annalitvinchuk@gmail.com', '+380979090900') 
+returning user_id
+)
+select * from user_log where user_id =(select user_id from new_user);
+
 	
