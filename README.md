@@ -31,3 +31,4 @@ created:
 - trigger to write logs, whenever user is created
 - procedure to create chat with given accounts
 - testing to show everything works properly
+- 3 roles with different permissions
