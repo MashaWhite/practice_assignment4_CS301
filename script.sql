@@ -1,12 +1,14 @@
 create database pa4;
+create schema messenger;
+set search_path to messenger; --цей рядок порадив ШІ, щоб не вказувати потім прикожній табиці, що вона належить цій схемі
 
-drop table if exists
 drop table if exists users cascade;
 drop table if exists accounts cascade;
 drop table if exists account_presence cascade;
 drop table if exists contacts cascade;
 drop table if exists chat_members cascade;
 drop table if exists messages cascade;
+drop table if exists user_log cascade;
 
 
 --створення таблиць
@@ -58,7 +60,7 @@ create table if not exists messages(
 create table if not exists user_log(
 	log_id int generated always as identity primary key,
     user_id int not null references users(user_id) on delete cascade,
-    action varchar,
+    user_action varchar not null,
     log_date timestamp default current_timestamp
 );
     
@@ -71,8 +73,8 @@ as $$
 begin
 	--вставляємо новий запис в user_log
 	--використовуємо new, тому що це tigger для insert
-	insert into user_log(user_id, action, log_date)
-	values(new.user_id, new.account_id, 'created user', current_timestamp);
+	insert into user_log(user_id, user_action, log_date)
+	values(new.user_id, 'created user', current_timestamp);
 	return new;
 end;	
 $$;
@@ -139,7 +141,7 @@ drop index if exists idx_account_is_online;
 drop index if exists idx_account_id_contact_id_contacts;
 drop index if exists idx_members_chat_id;
 drop INDEX if exists idx_chat_name_id;
-drop index if exists idx_message_іd_chat_id;
+drop index if exists idx_message_id_chat_id;
 
 /*для оптимізації мого запиту потрібні лише 
  -idx_members_chat_id, 
@@ -150,7 +152,7 @@ drop index if exists idx_message_іd_chat_id;
 create index if not exists idx_members_chat_id on chat_members(chat_id);
 create index if not exists idx_chat_name_id on chats(chat_id, chat_name);
 create index if not exists idx_account_id_is_online on account_presence(account_id, is_online);
-create index if not exists idx_message_іd_chat_id on messages(chat_id);
+create index if not exists idx_message_id_chat_id on messages(chat_id);
 create index if not exists idx_user_id on users(user_id);
 create index if not exists idx_account_id on accounts(account_id);
 create index if not exists idx_account_id_contact_id_contacts on contacts(account_id, contact_id);
