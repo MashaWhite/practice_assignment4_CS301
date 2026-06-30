@@ -177,4 +177,53 @@ returning user_id
 )
 select * from user_log where user_id =(select user_id from new_user);
 
-	
+--ролі
+
+--сервер застосунку, що працює з даними
+--він може вставляти дані, оновлювати, робити запити через select
+--для таблиці логи - лише insert
+do $$
+begin 
+	if not exists (select 1 from pg_roles where rolname = 'app_service') then
+		create role app_service login password '1782923-jJJkd';
+	end if;
+end
+$$;
+grant connect on database pa4 to app_service;
+grant usage on schema messenger to app_service;
+grant insert, update, select on 
+	users,
+	accounts,
+	account_presence,
+	contacts,
+	chats,
+	chat_members,
+	messages
+to app_service;
+grant insert on user_log to app_service;
+
+--аналітик - може лише читати дані для отримання статистики
+do $$
+begin 
+	if not exists (select 1 from pg_roles where rolname = 'analyst') then
+		create role analyst login password '178292123456Afghgdl3-jJJkd';
+	end if;
+end
+$$;
+grant connect on database pa4 to analyst;
+grant usage on schema messenger to analyst;
+grant select on all tables in schema messenger to analyst;
+
+--розробник
+--може створювати таблиці, але не видаляти і не змінювати записи
+do $$
+begin 
+	if not exists (select 1 from pg_roles where rolname = 'developer') then
+		create role developer login password '178292123456Afghgdl3-jJJkd';
+	end if;
+end
+$$;
+
+grant connect on database pa4 to developer;
+grant usage on schema messenger to developer;
+grant create on schema messenger to developer;
